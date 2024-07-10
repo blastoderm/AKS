@@ -1,0 +1,241 @@
+version: '3.9'
+networks:
+  assai:
+    driver: bridge
+services:
+    assaiweb:
+      networks:
+          - assai
+      image: ${IMAGE_REPO}/assaiweb:${IMAGE_VERSION}
+      environment:
+           - CATALINA_OPTS=-Xms512m -Xmx${MEMORY_ASSAIWEB} -Xss1024k
+           - INSTANCE_CODE=${INSTANCE_CODE}
+           - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+           - OCR_SERVICE_URL=http://assaiocr:8080/AO${INSTANCE_CODE}
+           - XREF_SERVICE_URL=http://assaidrawing:8080/AD${INSTANCE_CODE}/drawing/v1
+           - EMAIL_SERVICE_URL=http://assaimail:8080/AML${INSTANCE_CODE}/v1/sendMail
+           - AWEB_INTERNAL_BIRT_SERVER_URL=http://assaibirtreports:8080/AB${INSTANCE_CODE}/
+           - SAML_SP_INTERNAL_URL=http://assaisp:8080/ASP${INSTANCE_CODE}
+           - SEARCHBLOX_URL=http://assaisolr:8080/ASOLR${INSTANCE_CODE}
+           - SEARCHBLOX_CATALOG=${INSTANCE_CODE}
+           - DIGITAL_SIGNATURES_SERVER_URL=http://assaisigner:8080/ASI${INSTANCE_CODE}
+           - REST_API_URL=http://restgateway:8080/AA${INSTANCE_CODE}
+           - REDLINE_TOOL_CODEBASE_URL_INT=http://assairedline:8080/AR${INSTANCE_CODE}
+           - STATIC_CONTENT_CONTEXT=AssaiEPSS${INSTANCE_CODE}
+           - BIRT_SERVER_CONTEXT=AB${INSTANCE_CODE}
+      container_name: assaiweb
+      restart: always
+      command: apt update && apt install curl -y
+      deploy:
+        resources:
+          limits:
+            memory: ${MEMORY_ASSAIWEB}
+      volumes:
+            - ${FILE_SERVER}:/app/mount
+            - ${CONFIG_FOLDER}/databases.properties:/usr/local/apache-tomcat/conf/databases.properties
+            - ${LOG_FOLDER}/AssaiWEB:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/AssaiWEB:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    assaiadmin:
+        networks:
+            - assai
+        #image: ${IMAGE_REPO}/assaiadmin:latest
+        image: ${IMAGE_REPO}/assaiadmin:${IMAGE_VERSION}
+        environment:
+             - CATALINA_OPTS=-Xms512m -Xmx${MEMORY_ASSAIADMIN} -Xss1024k -Xdebug -Xrunjdwp:transport=dt_socket,server=y,address=*:8000,suspend=n
+             - INSTANCE_CODE=${INSTANCE_CODE}
+             - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+             - OCR_SERVICE_URL=http://assaiocr:8080/AO${INSTANCE_CODE}
+             - XREF_SERVICE_URL=http://assaidrawing:8080/AD${INSTANCE_CODE}/drawing/v1
+             - EMAIL_SERVICE_URL=http://assaimail:8080/AML${INSTANCE_CODE}/v1/sendMail
+             - GENERATE_TRX_FILE_SERVICE_URL=http://assaimail:8080/AML${INSTANCE_CODE}/v1/generateTransmittalFile
+             - AWEB_INTERNAL_BIRT_SERVER_URL=http://assaibirtreports:8080/AB${INSTANCE_CODE}/
+             - SAML_SP_INTERNAL_URL=http://assaisp:8080/ASP${INSTANCE_CODE}
+             - STATIC_CONTENT_CONTEXT=AssaiEPSS${INSTANCE_CODE}
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_ASSAIADMIN}
+        container_name: assaiadmin
+        restart: always
+        volumes:
+            - ${FILE_SERVER}:/app/mount
+            - ${CONFIG_FOLDER}/databases.properties:/usr/local/apache-tomcat/conf/databases.properties
+            - ${LOG_FOLDER}/AssaiADMIN:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/AssaiADMIN:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+        ports:
+            - 8000:8000    # Expose the debug port
+    assaistatic:
+        networks:
+            - assai
+        image: ${IMAGE_REPO}/assaiepss:${IMAGE_VERSION}
+        environment:
+             - CATALINA_OPTS=-Xms256m -Xmx${MEMORY_ASSAISTATIC} -Xss512k
+             - INSTANCE_CODE=${INSTANCE_CODE}
+             - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+        container_name: assaiepss
+        restart: always
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_ASSAISTATIC}
+        volumes:
+            - ${LOG_FOLDER}/AssaiEPSS:/usr/local/apache-tomcat/logs
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    assaijobs:
+        networks:
+            - assai
+        image: ${IMAGE_REPO}/assaijobs:${IMAGE_VERSION}
+        environment:
+             - CATALINA_OPTS=-Xms512m -Xmx${MEMORY_ASSAIJOBS} -Xss1024k
+             - INSTANCE_CODE=${INSTANCE_CODE}
+             - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+             - EMAIL_SERVICE_URL=http://assaimail:8080/AML${INSTANCE_CODE}/v1/sendMail
+             - OCR_SERVICE_URL=http://assaiocr:8080/AO${INSTANCE_CODE}
+             - AWEB_INTERNAL_BIRT_SERVER_URL=http://assaibirtreports:8080/AB${INSTANCE_CODE}/
+             - AJOB_URL=http://assaijobs:8080/AJ${INSTANCE_CODE}/
+        container_name: assaijobs
+        restart: always
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_ASSAIJOBS}
+        volumes:
+            - ${FILE_SERVER}:/app/mount
+            - ${CONFIG_FOLDER}/databases.properties:/usr/local/apache-tomcat/conf/databases.properties
+            - ${LOG_FOLDER}/AssaiJOBS:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/AssaiJOBS:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    restgateway:
+        networks:
+            - assai
+        image: ${IMAGE_REPO}/restgateway:${IMAGE_VERSION}
+        environment:
+             - CATALINA_OPTS=-Xms512m -Xmx${MEMORY_REST} -Xss1024k
+             - INSTANCE_CODE=${INSTANCE_CODE}
+             - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+             - RESTAPICACHE_DIR=/usr/local/restapiCache
+             - CUSTOMSERVICE_DIR=/usr/local/customServices
+        container_name: restgateway
+        restart: always
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_REST}
+        volumes:
+            - ${FILE_SERVER}:/app/mount
+            - ${CONFIG_FOLDER}/restapiCache:/usr/local/restapiCache
+            - ${CONFIG_FOLDER}/customServiceDir:/usr/local/customServices
+            - ${CONFIG_FOLDER}/databases.properties:/usr/local/apache-tomcat/conf/databases.properties
+            - ${LOG_FOLDER}/restgateway:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/restgateway:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    assaimail:
+        networks:
+            - assai
+        image: ${IMAGE_REPO}/assaimail:${IMAGE_VERSION}
+        environment:
+             - CATALINA_OPTS=-Xms512m -Xmx${MEMORY_MAIL} -Xss512k
+             - INSTANCE_CODE=${INSTANCE_CODE}
+             - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+             - AWEB_INTERNAL_BIRT_SERVER_URL=http://assaibirtreports:8080/AB${INSTANCE_CODE}/
+        container_name: assaimail
+        restart: always
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_MAIL}
+        volumes:
+            - ${FILE_SERVER}:/app/mount
+            - ${CONFIG_FOLDER}/common.properties:/usr/local/apache-tomcat/conf/common.properties
+            - ${CONFIG_FOLDER}/email.properties:/usr/local/apache-tomcat/conf/AML${INSTANCE_CODE}/email.properties
+            - ${LOG_FOLDER}/assaimail:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/assaimail:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    assaibirtreports:
+        networks:
+            - assai
+        image: ${IMAGE_REPO}/assaibirtreports:${IMAGE_VERSION}
+        environment:
+            - CATALINA_OPTS=-Xms512m -Xmx${MEMORY_BR} -Xss512k
+            - INSTANCE_CODE=${INSTANCE_CODE}
+            - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+        container_name: assaibirtreports
+        restart: always
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_BR}
+        volumes:
+            - ${CUSTOM_REPORTS}:/usr/local/CustomBirtReports/Custom reports
+            - ${LOG_FOLDER}/AssaiBirtReports:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/AssaiBirtReports:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    assaisp:
+        networks:
+            - assai
+        image: ${IMAGE_REPO}/assaisp:${IMAGE_VERSION}
+        environment:
+            - CATALINA_OPTS=-Xms256m -Xmx${MEMORY_SP} -Xss512k
+            - INSTANCE_CODE=${INSTANCE_CODE}
+            - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+        container_name: assaisp
+        restart: always
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_SP}
+        volumes:
+            - ${CONFIG_FOLDER}/common.properties:/usr/local/apache-tomcat/conf/common.properties
+            - ${CONFIG_FOLDER}/AssaiSP:/usr/local/apache-tomcat/conf/ASP${INSTANCE_CODE}
+            - ${LOG_FOLDER}/AssaiSP:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/AssaiSP:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    assaifilecrawler:
+        networks:
+            - assai
+        image: ${IMAGE_REPO}/assaifilecrawler:${IMAGE_VERSION}
+        environment:
+             - CATALINA_OPTS=-Xms256m -Xmx${MEMORY_FC} -Xss512k
+             - INSTANCE_CODE=${INSTANCE_CODE}
+             - DEPLOYMENT_ENV=${DEPLOYMENT_ENV}
+             - OCR_SERVICE_URL=http://assaiocr:8080/AO${INSTANCE_CODE}
+        container_name: assaifilecrawler
+        restart: always
+        deploy:
+          resources:
+            limits:
+              memory: ${MEMORY_FC}
+        volumes:
+            - ${FILE_SERVER}:/app/mount
+            - ${CONFIG_FOLDER}/databases.properties:/usr/local/apache-tomcat/conf/databases.properties
+            - ${LOG_FOLDER}/assaifilecrawler:/usr/local/apache-tomcat/logs
+            - ${TEMP_FOLDER}/assaifilecrawler:/usr/local/apache-tomcat/temp
+            - /etc/localtime:/etc/localtime:ro
+            - /etc/timezone:/etc/timezone:ro
+    nginx:
+       networks:
+           - assai
+       image: ${IMAGE_REPO}/assainginx:1.0.0.0
+       container_name: assainginx
+       environment:
+           - INSTANCE_CODE=${INSTANCE_CODE}
+           - HOST_NAME=${HOST_NAME}
+       ports:
+         - 81:80
+       restart: always
+       deploy:
+         resources:
+           limits:
+             memory: 2G
+       volumes:
+         - ${LOG_FOLDER}/AssaiNginx:/var/log/nginx
